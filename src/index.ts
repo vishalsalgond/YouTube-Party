@@ -5,7 +5,8 @@ import socketIO from "socket.io";
 import { generateMessage } from './utils/messages';
 import {
     addUser, getUser, UserType, getAllUsers,
-    getRoomOwner, checkIfUserExists, checkIfRoomExists
+    getRoomOwner, checkIfUserExists, checkIfRoomExists,
+    getSocketId, removeUserFromRoom
 } from './utils/users';
 import { generateRoomID } from './utils/generateRoomID';
 import { callbackify } from 'util';
@@ -49,7 +50,7 @@ io.on("connection", (socket: any) => {
     var currUser: UserType;
 
     const updateUsersList = (roomID: string) => {
-        const usersList: UserType[] = getAllUsers()
+        const usersList: UserType[] = getAllUsers(roomID)
         socket.emit('roomUsersList', { usersList })
         socket.to(roomID).emit('roomUsersList', { usersList });
     }
@@ -83,7 +84,6 @@ io.on("connection", (socket: any) => {
         }
 
         addUser(user)
-
         currUser = user
 
         socket.join(user.room)
@@ -97,12 +97,12 @@ io.on("connection", (socket: any) => {
 
     })
 
-    socket.on("videoPaused", () => {
-        socket.to(currUser.room).emit("videoPaused");
+    socket.on("videoPaused", (currentStatus: any) => {
+        socket.to(currUser.room).emit("videoPaused", currentStatus);
     })
 
-    socket.on("videoPlaying", (currentTime: any) => {
-        socket.to(currUser.room).emit("videoPlaying", currentTime);
+    socket.on("videoPlaying", (currentStatus: any) => {
+        socket.to(currUser.room).emit("videoPlaying", currentStatus);
     })
 
     socket.on('sendMessage', (message: any, callback: any) => {
@@ -124,6 +124,14 @@ io.on("connection", (socket: any) => {
         socket.to(socket_id).emit("getLatestTime")
     })
 
+    socket.on("leaveRoom", (username: string, roomId: string) => {
+        const socket_id: string | undefined = getSocketId(username, roomId)
+        socket.leave(socket_id);
+        removeUserFromRoom(username)
+        updateUsersList(roomId)
+        const message: string = "has left the Room 😢"
+        socket.to(roomId).emit('message', generateMessage(username, message))
+    });
 
 });
 

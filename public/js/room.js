@@ -8,6 +8,7 @@ var clipboard = new ClipboardJS(btn);
 // Elements
 const $messageForm = document.querySelector('#message-form');
 const $messageFormButton = document.querySelector("#submit-button");
+const $leaveButton = document.querySelector("#leave-button");
 const $messageFormInput = document.querySelector("#inputMessage");
 const $urlForm = document.querySelector("#url-form");
 const $messages = document.querySelector('#messages');
@@ -17,7 +18,6 @@ const $channelName = document.querySelector("#channel-name");
 const $videos = document.querySelector('#videos');
 const $nextVideo = document.querySelector("#next-video")
 const $greet = document.querySelector("#greeting")
-
 
 // Templates
 const messageTemplate = document.querySelector("#message-template").innerHTML;
@@ -30,7 +30,6 @@ const params = new URLSearchParams(window.location.search);
 var username = params.get('username');
 var roomid;
 var role;
-var control;
 var finished = false;
 $greet.innerHTML = "Welcome, " + username
 initialSetup();
@@ -45,7 +44,6 @@ async function initialSetup() {
         document.getElementById("roomid").value = roomid;
         $urlForm.style.visibility = "hidden"
         $nextVideo.style.visibility = "hidden"
-        control = 0;
 
     } else {
         role = 'ADMIN';
@@ -54,7 +52,6 @@ async function initialSetup() {
             roomid = id;
             document.getElementById("roomid").value = id;
         })
-        control = 1;
     }
 }
 
@@ -79,10 +76,10 @@ $messageForm.addEventListener('submit', (e) => {
 })
 
 // gets the videoID from URL (string) 
-function youtube_parser(url) {
-    var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-    var match = url.match(regExp);
-    return (match && match[7].length == 11) ? match[7] : false;
+function getYouTubeVideoId(url) {
+    const regex = /(?:\?v=|\/embed\/|youtu\.be\/|\/watch\?t=.*?&v=)([a-zA-Z0-9_-]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
 }
 
 
@@ -104,7 +101,7 @@ function playNextVideo() {
     if (playlistQueue.length > 0) {
 
         const nextVideo = playlistQueue.shift()
-        player.cueVideoById(youtube_parser(nextVideo.video_url), 0)
+        player.cueVideoById(getYouTubeVideoId(nextVideo.video_url), 0)
         $videoTitle.innerHTML = nextVideo.title
         $channelName.innerHTML = nextVideo.channel
 
@@ -153,15 +150,134 @@ $urlForm.addEventListener('submit', (event) => {
     addVideo()
 })
 
+$leaveButton.onclick = function () {
+    socket.emit("leaveRoom", username, roomid);
+    socket.disconnect();
+    console.log('User has left the room');
+
+    window.location.href = '/';
+}
+
+
+
+
+//YOUTUBE IFRAME API
+
+// this code loads the IFrame Player API code asynchronously
+var tag = document.createElement('script');
+
+tag.src = "https://www.youtube.com/iframe_api";
+var firstScriptTag = document.getElementsByTagName('script')[0];
+firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+// this function creates an <iframe> (and YouTube player)
+// after the API code downloads.
+var player;
+
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player('player', {
+        height: '450',
+        width: '800',
+        videoId: 'n_Cn8eFo7u8',
+        playerVars: {
+            'playsinline': 1,
+            'start': 0,
+            'disablekb': 1
+        },
+        events: {
+            'onReady': onPlayerReady,
+            'onStateChange': onPlayerStateChange
+        }
+    });
+
+    // disable pointer events for guest users
+    if (role === 'GUEST') {
+        const iframe = document.querySelector('.video-container iframe');
+        iframe.classList.add('unclickable');
+    }
+}
+
+// the API will call this function when the video player is ready
+function onPlayerReady(event) {
+    event.target.pauseVideo();
+    socket.emit("getLatestTime")
+}
+
+function onPlayerStateChange(event) {
+
+    if (event.data === YT.PlayerState.PAUSED) {
+        if (role === 'ADMIN') {
+            const currentStatus = {
+                currentTime: player.getCurrentTime(),
+                videoId: null
+            }
+            socket.emit("videoPaused", currentStatus)
+        }
+    }
+
+    if (event.data === YT.PlayerState.PLAYING) {
+        if (role === 'ADMIN') {
+            const currentStatus = {
+                currentTime: player.getCurrentTime(),
+                videoId: null
+            }
+            socket.emit("videoPlaying", currentStatus)
+        }
+    }
+
+    if (event.data === YT.PlayerState.ENDED) {
+        playNextVideo()
+    }
+
+}
+
+
+// SOCKET EVENTS
+
+socket.on("videoPaused", (currentStatus) => {
+    if (currentStatus.videoId) {
+        player.loadVideoById(currentStatus.videoId, currentStatus.currentTime)
+    } else {
+        player.seekTo(currentStatus.currentTime, true)
+    }
+    player.pauseVideo();
+})
+
+socket.on("videoPlaying", (currentStatus) => {
+    if (currentStatus.videoId) {
+        player.loadVideoById(currentStatus.videoId, currentStatus.currentTime)
+    } else {
+        player.seekTo(currentStatus.currentTime, true)
+        player.playVideo();
+    }
+})
+
+socket.on("getLatestTime", () => {
+    const currentStatus = {
+        currentTime: player.getCurrentTime(),
+        videoId: getYouTubeVideoId(player.getVideoUrl())
+    }
+
+    if (currentStatus.currentTime > 0) {
+        if (player.getPlayerState() == 1) {
+            socket.emit("videoPlaying", currentStatus)
+        } else if (player.getPlayerState() == 2) {
+            socket.emit("videoPaused", currentStatus)
+        }
+    }
+})
+
+socket.on("playNextVideo", () => {
+    playNextVideo()
+})
+
 socket.on("playlistUpdated", (updatedPlaylist) => {
-    console.log("Got updated");
     playlistQueue = updatedPlaylist
     displayPlaylist()
 })
 
-// Only ADMIN will receive this
+
 socket.on("getUpdatedPlaylist", () => {
-    console.log("Got update message");
     socket.emit("playlistUpdated", playlistQueue)
 })
 
@@ -179,114 +295,12 @@ socket.on('roomUsersList', (usersList) => {
     $users.innerHTML = ''
     for (var index = 0; index < list.length; index++) {
         var username = list[index].username
-        if (list[index].role === 'ADMIN') {
-            username += " (Owner)"
-        }
+        var role = list[index].role
+
         const html = Mustache.render(userTemplate, {
             username: username,
+            role: role
         })
         $users.insertAdjacentHTML('beforeend', html)
     }
-})
-
-
-
-
-
-
-//YOUTUBE
-
-// this code loads the IFrame Player API code asynchronously
-var tag = document.createElement('script');
-
-tag.src = "https://www.youtube.com/iframe_api";
-var firstScriptTag = document.getElementsByTagName('script')[0];
-firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-// this function creates an <iframe> (and YouTube player)
-// after the API code downloads.
-var player;
-
-function onYouTubeIframeAPIReady() {
-    player = new YT.Player('player', {
-        height: '450',
-        width: '800',
-        videoId: 'M7lc1UVf-VE',
-        playerVars: {
-            'playsinline': 1,
-            'controls': control,
-            'start': 0,
-            'disablekb': 1
-        },
-        events: {
-            'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange
-        }
-    });
-}
-
-// the API will call this function when the video player is ready
-function onPlayerReady(event) {
-    event.target.pauseVideo();
-    socket.emit("getLatestTime")
-}
-
-var track = []; // user = 1, admin = 2
-function onPlayerStateChange(event) {
-
-    if (event.data === YT.PlayerState.PAUSED) {
-        if (role === 'ADMIN') {
-            socket.emit("videoPaused");
-        }
-        // else {
-        //     if (track.length == 0) {
-        //         track.push(1)
-        //     }
-        // }
-    }
-
-    if (event.data === YT.PlayerState.PLAYING) {
-        if (role === 'ADMIN') {
-            const currentTime = player.getCurrentTime()
-            socket.emit("videoPlaying", currentTime)
-        }
-        // else {
-        //     if (pausedByAdmin === 1 && pausedByUser === 0) {
-        //         socket.emit("getLatestTime")
-        //         pausedByAdmin = -1;
-        //     }
-
-        //     // pausedByAdmin = false;
-        // }
-    }
-
-    if (event.data === YT.PlayerState.ENDED) {
-        playNextVideo()
-    }
-
-}
-
-socket.on("videoPaused", () => {
-    // console.log("paused by admin");
-    track.push(2)
-    player.pauseVideo();
-})
-
-socket.on("videoPlaying", (currentTime) => {
-    // console.log("played by admin");
-    // if (pausedByAdmin === true && pausedByUser === false) {
-    player.seekTo(currentTime, true)
-    player.playVideo();
-    // }
-})
-
-socket.on("getLatestTime", () => {
-    const currentTime = player.getCurrentTime()
-    if (currentTime > 0) {
-        socket.emit("videoPlaying", currentTime)
-    }
-})
-
-socket.on("playNextVideo", () => {
-    playNextVideo()
 })

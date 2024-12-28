@@ -39,9 +39,24 @@ export const getUser = (id: string) => {
     return users.find((user) => user.id == id);
 }
 
-// get list of all users
-export const getAllUsers = () => {
-    return users;
+// get list of all users in the room
+export const getAllUsers = (roomId: string) => {
+    const roomUsers: UserType[] = users.filter(user => user.room === roomId)
+    return roomUsers;
+}
+
+export const getSocketId = (username: string, roomid: string) => {
+    const user: UserType | undefined = checkIfUserExists(username, roomid)
+    if (user) {
+        return user.id
+    }
+}
+
+export const removeUserFromRoom = (username: string) => {
+    const index: number = users.findIndex(user => user.username == username)
+    if (index != -1) {
+        return users.splice(index, 1)[0]
+    }
 }
 
 export const checkIfUserExists = (username: string, roomid: string) => {
@@ -52,6 +67,7 @@ export const checkIfUserExists = (username: string, roomid: string) => {
 export const checkIfRoomExists = (roomid: string) => {
     return users.find(user => user.room === roomid)
 }
+
 // given the roomid, get the id of the owner of the room
 export const getRoomOwner = (roomid: string) => {
 

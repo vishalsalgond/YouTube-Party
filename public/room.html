@@ -115,10 +115,12 @@
                         <div class="chat bg-light text-dark">
                             <div class="chat__main">
                                 <div id="users" class="chat__messages"></div>
+                                <div class="compose">
+                                    <button id="leave-button" class="w-100 btn btn-danger">Leave Room</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -132,11 +134,12 @@
         </script>
 
         <script id="user-template" type="text/html">
-            <table class="table table-borderless table-striped">
+            <table class="table table-sm">
                 <tbody>
                     <tr>
-                        <td class="table-primary font-weight-bold text-primary p-3">
-                            <b>{{ username }}</b>
+                        <td class="table">
+                            {{ username }}
+                            <span class="badge ms-2 bg-secondary">  {{ role }}  </span>
                         </td>
                     </tr>
                 </tbody>
@@ -152,7 +155,7 @@
                                 <img src="{{ thumbnail_url }}" alt="" style="width: 150px; height: 84px; object-fit: cover;" width="150", height="120">
                             </div>
                             <div class="col-lg-7">
-                                <p class="fs-6 m-2">{{ title }}</p>
+                                <p class="fs-6 m-2"> <small> {{ title }} </small></p>
                             </div>
                         </div>
                     </div>

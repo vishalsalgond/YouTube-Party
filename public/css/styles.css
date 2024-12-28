@@ -75,6 +75,10 @@ body{
     height: 100%;
 }
 
+.unclickable {
+    pointer-events: none;
+}
+
 a {
     text-decoration: none;
 }
