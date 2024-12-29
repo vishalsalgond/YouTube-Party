@@ -12,7 +12,7 @@ A video synchronization platform where you can create rooms, watch YouTube video
 # Getting started
 - Clone the repository
 ```
-git clone --depth=1 https://github.com/ZalakBhojani/Youtube-Party.git <project_name>
+git clone --depth=1 https://github.com/vishalsalgond/YouTube-Party.git <project_name>
 ```
 
 - Install dependencies
