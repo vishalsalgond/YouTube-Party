@@ -1,11 +1,11 @@
 # Youtube-Party
-A video synchronization platform where you can create rooms, watch YouTube videos and chat with your friends in real-time.
+A video synchronization platform where you can create rooms, watch YouTube videos, and chat with your friends in real time.
 
-# How it works?
-- Create room and share the automatically generated Room ID with your friends.
+# How does it work?
+- Create a room and share the automatically generated Room ID with your friends.
 - Use the Room ID and join the room to start the party!
-- Enter the URL of the YouTube video you want to watch (only admin can do this).
-- Start watching the video whose playback is synchronized.
+- Enter the URL of the YouTube video you want to watch (only the admin can do this).
+- Start watching the video while the playback is synchronized automatically.
 - Create a playlist to watch more videos.
 
 
